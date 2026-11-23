@@ -1,3 +1,4 @@
+import html
 import io
 import os
 import re
@@ -69,6 +70,8 @@ if "retry_seconds" not in st.session_state:
     st.session_state.retry_seconds = None
 if "log_errors" not in st.session_state:
     st.session_state.log_errors = 0
+if "last_log_error" not in st.session_state:
+    st.session_state.last_log_error = ""
 if "quota_blocked" not in st.session_state:
     st.session_state.quota_blocked = False
 if "reset_override" not in st.session_state:
@@ -85,41 +88,42 @@ st.markdown(
     header[data-testid="stHeader"] { background: transparent; height: 0; min-height: 0; }
     button[data-testid="stSidebarCollapseButton"], [data-testid="collapsedControl"] { display: none; }
     h1, h2, h3 { font-family: 'Playfair Display', serif !important; color: #0a0a0a; }
-    .block-container { padding-top: 0.35rem !important; padding-bottom: 1.5rem !important; max-width: 720px; }
-    .header-wrap { text-align: center; margin: 0 auto 0.4rem auto; }
-    .header-wrap h1 { font-size: 1.65rem; letter-spacing: 0.06em; margin: 0 0 0.12rem 0; font-weight: 500; line-height: 1.2; }
-    .header-wrap .subtitle { font-size: 0.58rem; color: #6b6b6b; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 400; margin: 0; }
-    .header-rule { border-top: 1px solid #0a0a0a; margin: 0.5rem 0 0.85rem 0; }
-    .chat-row { margin: 0.9rem 0; display: flex; flex-direction: column; }
+    .block-container { padding-top: 0.25rem !important; padding-bottom: 4.2rem !important; max-width: 720px; }
+    .header-wrap { text-align: center; margin: 0 auto 0.25rem auto; }
+    .header-wrap h1 { font-size: 1.5rem; letter-spacing: 0.06em; margin: 0; font-weight: 500; line-height: 1.15; }
+    .header-wrap .subtitle { font-size: 0.56rem; color: #6b6b6b; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 400; margin: 0; }
+    .header-rule { border-top: 1px solid #0a0a0a; margin: 0.35rem 0 0.5rem 0; }
+    .chat-row { margin: 0.75rem 0; display: flex; flex-direction: column; }
     .chat-row-user { align-items: flex-end; }
     .chat-row-bot { align-items: flex-start; }
-    .bubble-user { background-color: #0a0a0a; color: #ffffff; padding: 0.85rem 1.15rem; font-size: 0.9rem; line-height: 1.65; max-width: 78%; }
-    .bubble-bot { background-color: #ffffff; color: #0a0a0a; padding: 0.95rem 1.15rem; font-size: 0.9rem; line-height: 1.7; max-width: 88%; border-left: 1px solid #0a0a0a; }
+    .bubble-user { background-color: #0a0a0a; color: #ffffff; padding: 0.75rem 1.05rem; font-size: 0.9rem; line-height: 1.6; max-width: 78%; }
+    .bubble-bot { background-color: #ffffff; color: #0a0a0a; padding: 0.8rem 1.05rem; font-size: 0.9rem; line-height: 1.65; max-width: 88%; border-left: 1px solid #0a0a0a; }
     .bubble-critic { border-left-style: dashed; }
     .bubble-mentor { border-left: 3px solid #0a0a0a; }
-    .speaker-label { font-size: 0.6rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.35rem; color: #6b6b6b; }
+    .speaker-label { font-size: 0.6rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.3rem; color: #6b6b6b; }
     .tag-statute, .tag-binding { background:#0a0a0a; color:#fff; padding:0 4px; font-size:0.7em; letter-spacing:0.04em; }
     .tag-persuasive { border:1px solid #0a0a0a; padding:0 4px; font-size:0.7em; letter-spacing:0.04em; }
     .tag-unsettled { background:#f2c94c; color:#0a0a0a; padding:0 4px; font-size:0.7em; letter-spacing:0.04em; }
     .tag-inference { background:#e2e2e2; color:#0a0a0a; padding:0 4px; font-size:0.7em; letter-spacing:0.04em; }
-    .rate-banner { background-color: #0a0a0a; color: #ffffff; padding: 1rem 1.2rem; margin: 1rem 0; text-align: center; font-size: 0.85rem; line-height: 1.6; }
+    .rate-banner { background-color: #0a0a0a; color: #ffffff; padding: 0.9rem 1.1rem; margin: 0.75rem 0; text-align: center; font-size: 0.85rem; line-height: 1.55; }
     .rate-banner a { color: #ffffff; text-decoration: underline; }
     section[data-testid="stSidebar"] { background-color: #f7f7f7; border-right: 1px solid #e2e2e2; }
-    section[data-testid="stSidebar"] .block-container { padding-top: 0.9rem !important; }
-    section[data-testid="stSidebar"] h3 { font-family: 'Playfair Display', serif !important; font-size: 1.05rem; margin-bottom: 0.4rem; margin-top: 0; }
-    .session-tag { font-size: 0.55rem; color: #9b9b9b; letter-spacing: 0.1em; text-align: center; margin-bottom: 0.7rem; font-family: 'Inter', monospace; }
+    section[data-testid="stSidebar"] .block-container { padding-top: 0.85rem !important; padding-bottom: 1rem !important; }
+    section[data-testid="stSidebar"] h3 { font-family: 'Playfair Display', serif !important; font-size: 1.05rem; margin-bottom: 0.35rem; margin-top: 0; }
+    .session-tag { font-size: 0.55rem; color: #9b9b9b; letter-spacing: 0.1em; text-align: center; margin-bottom: 0.6rem; font-family: 'Inter', monospace; }
     .stButton > button { background-color: #0a0a0a; color: #ffffff; border: 1px solid #0a0a0a; padding: 0.5rem 1.2rem; font-size: 0.75rem; letter-spacing: 0.06em; font-weight: 500; text-transform: uppercase; }
     .stButton > button:hover { background-color: #ffffff; color: #0a0a0a; }
     .stDownloadButton > button { background-color: transparent; color: #0a0a0a; border: 1px solid #0a0a0a; font-size: 0.72rem; padding: 0.45rem 0.9rem; letter-spacing: 0.06em; font-weight: 500; text-transform: uppercase; }
     .stDownloadButton > button:hover { background-color: #0a0a0a; color: #ffffff; }
+    [data-testid="stBottom"] > div { padding-top: 0.3rem !important; padding-bottom: 0.4rem !important; background-color: #ffffff !important; }
     .stChatInput textarea { border-radius: 0 !important; border: 1px solid #0a0a0a !important; font-size: 0.9rem !important; background-color: #ffffff !important; color: #0a0a0a !important; }
-    .sidebar-cta { background-color: #0a0a0a; color: #ffffff; padding: 0.95rem 0.85rem; text-align: center; margin-top: 0.4rem; }
-    .sidebar-cta p { margin: 0 0 0.6rem 0; opacity: 0.9; font-family: 'Playfair Display', serif; font-size: 0.9rem; }
+    .sidebar-cta { background-color: #0a0a0a; color: #ffffff; padding: 0.9rem 0.85rem; text-align: center; margin-top: 0.35rem; }
+    .sidebar-cta p { margin: 0 0 0.55rem 0; opacity: 0.9; font-family: 'Playfair Display', serif; font-size: 0.9rem; }
     .sidebar-cta a { display: inline-block; padding: 0.45rem 0.9rem; background-color: #ffffff; color: #0a0a0a; text-decoration: none; font-weight: 500; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
-    .footer-disclaimer { font-size: 0.58rem; color: #8a8a8a; text-align: center; margin-top: 2.2rem; padding-top: 0.9rem; border-top: 1px solid #e2e2e2; line-height: 1.7; max-width: 620px; margin-left: auto; margin-right: auto; }
-    .empty-state { text-align: center; padding: 2rem 1rem; color: #6b6b6b; }
-    .empty-state p { font-size: 0.85rem; line-height: 1.8; max-width: 470px; margin: 0 auto; }
-    .empty-state .hint { font-family: 'Playfair Display', serif; font-size: 1.15rem; color: #0a0a0a; margin-bottom: 0.5rem; }
+    .footer-disclaimer { font-size: 0.56rem; color: #8a8a8a; text-align: center; margin-top: 0.75rem; padding-top: 0.55rem; border-top: 1px solid #e2e2e2; line-height: 1.5; max-width: 620px; margin-left: auto; margin-right: auto; }
+    .empty-state { text-align: center; padding: 0.85rem 0.75rem; color: #6b6b6b; }
+    .empty-state p { font-size: 0.82rem; line-height: 1.55; max-width: 470px; margin: 0 auto; }
+    .empty-state .hint { font-family: 'Playfair Display', serif; font-size: 1.05rem; color: #0a0a0a; margin-bottom: 0.3rem; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -210,10 +214,12 @@ def check_global_quota():
     if not APPS_SCRIPT_URL or not LOG_SECRET:
         return True, ""
     try:
-        r = requests.get(APPS_SCRIPT_URL, params={"token": LOG_SECRET}, timeout=5)
+        r = requests.get(APPS_SCRIPT_URL, params={"token": LOG_SECRET}, timeout=10)
+        r.raise_for_status()
         data = r.json()
         return bool(data.get("allowed", True)), str(data.get("reset_message", "") or "")
-    except Exception:
+    except Exception as exc:
+        st.session_state.last_log_error = f"Quota GET: {exc}"
         return True, ""
 
 
@@ -228,13 +234,21 @@ def flush_turn_logs(rows):
     width = max(len(r) for r in rows)
     norm = [r + [""] * (width - len(r)) for r in rows]
     try:
-        requests.post(
+        r = requests.post(
             APPS_SCRIPT_URL,
             json={"token": LOG_SECRET, "increment_turn": True, "rows": norm},
-            timeout=8,
+            timeout=15,
         )
-    except Exception:
+        r.raise_for_status()
+        payload = r.json()
+        if not payload.get("ok"):
+            st.session_state.log_errors += 1
+            st.session_state.last_log_error = f"POST rejected: {payload}"
+        else:
+            st.session_state.last_log_error = ""
+    except Exception as exc:
         st.session_state.log_errors += 1
+        st.session_state.last_log_error = f"POST failed: {exc}"
 
 
 if not st.session_state.quota_blocked:
@@ -259,10 +273,10 @@ def tag_summary(text: str) -> str:
     return ";".join(parts) if parts else "NONE"
 
 
-def style_tags(html_text: str) -> str:
+def style_tags(escaped_html_text: str) -> str:
     return TAG_RE.sub(
         lambda m: f'<span class="tag-{m.group(1).lower()}">{m.group(1).upper()}</span>',
-        html_text,
+        escaped_html_text,
     )
 
 
@@ -484,6 +498,8 @@ with st.sidebar:
         st.button("Clear Conversation", disabled=True, use_container_width=True)
     if st.session_state.log_errors:
         st.caption(f"Telemetry write failures: {st.session_state.log_errors}")
+    if st.session_state.last_log_error:
+        st.caption(f"Log detail: {st.session_state.last_log_error[:110]}")
     st.markdown("---")
     st.markdown(
         f'<div class="sidebar-cta"><p>Need a lawyer\'s view?</p><a href="{CTA_URL}" target="_blank">{CTA_LABEL}</a></div>',
@@ -652,9 +668,10 @@ if not st.session_state.history:
     )
 
 for h in st.session_state.history:
+    safe_content = html.escape(h["content"])
     if h["role"] == "user":
         st.markdown(
-            f'<div class="chat-row chat-row-user"><div class="bubble-user">{h["content"]}</div></div>',
+            f'<div class="chat-row chat-row-user"><div class="bubble-user">{safe_content.replace(chr(10), "<br>")}</div></div>',
             unsafe_allow_html=True,
         )
     else:
@@ -663,7 +680,7 @@ for h in st.session_state.history:
             "Critic": "bubble-bot bubble-critic",
             "Mentor": "bubble-bot bubble-mentor",
         }.get(h["role"], "bubble-bot")
-        rendered = style_tags(h["content"]).replace("\n", "<br>")
+        rendered = style_tags(safe_content).replace("\n", "<br>")
         st.markdown(
             f'<div class="chat-row chat-row-bot"><div class="{cls}"><div class="speaker-label">{h["role"]}</div>{rendered}</div></div>',
             unsafe_allow_html=True,
@@ -700,67 +717,46 @@ if not blocked:
             f"This session has reached its limit of {MAX_TURNS_PER_SESSION} questions. Reload to start a new session, or book a consultation."
         )
     else:
-        user_input = st.chat_input("Ask a legal question or describe a scenario...")
+        user_input = st.chat_input(
+            "Ask a legal question or describe a scenario...", max_chars=MAX_INPUT_CHARS
+        )
         if user_input:
-            if len(user_input) > MAX_INPUT_CHARS:
-                st.warning(
-                    f"Please keep your question under {MAX_INPUT_CHARS} characters."
-                )
+            allowed, override = check_global_quota()
+            if not allowed:
+                st.session_state.quota_blocked = True
+                if override:
+                    st.session_state.reset_override = override
+                st.rerun()
             else:
-                allowed, override = check_global_quota()
-                if not allowed:
-                    st.session_state.quota_blocked = True
-                    if override:
-                        st.session_state.reset_override = override
-                    st.rerun()
-                else:
-                    turn = turns_used() + 1
-                    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
-                    turn_rows = []
-                    st.session_state.history.append(
-                        {"role": "user", "content": user_input}
+                turn = turns_used() + 1
+                now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                turn_rows = []
+                st.session_state.history.append(
+                    {"role": "user", "content": user_input}
+                )
+                turn_rows.append(
+                    [
+                        now_iso,
+                        st.session_state.session_id,
+                        turn,
+                        "user",
+                        "",
+                        "",
+                        "",
+                        "",
+                        user_input,
+                        "",
+                    ]
+                )
+                for role in active_roles:
+                    model_id = role_models[role]
+                    ctx = build_context(st.session_state.history, role)
+                    reply, retry_time, finish, latency = call_model(
+                        model_id, ctx, role
                     )
-                    turn_rows.append(
-                        [
-                            now_iso,
-                            st.session_state.session_id,
-                            turn,
-                            "user",
-                            "",
-                            "",
-                            "",
-                            "",
-                            user_input,
-                            "",
-                        ]
-                    )
-                    for role in active_roles:
-                        model_id = role_models[role]
-                        ctx = build_context(st.session_state.history, role)
-                        reply, retry_time, finish, latency = call_model(
-                            model_id, ctx, role
-                        )
-                        if retry_time is not None:
-                            st.session_state.rate_limited = True
-                            st.session_state.retry_seconds = retry_time
-                            turn_rows.append(
-                                [
-                                    now_iso,
-                                    st.session_state.session_id,
-                                    turn,
-                                    role,
-                                    model_id,
-                                    model_id,
-                                    finish,
-                                    latency,
-                                    f"[{finish}]",
-                                    "",
-                                ]
-                            )
-                            break
-                        st.session_state.history.append(
-                            {"role": role, "content": reply, "model": model_id}
-                        )
+                    if retry_time is not None:
+                        st.session_state.rate_limited = True
+                        st.session_state.retry_seconds = retry_time
                         turn_rows.append(
                             [
                                 now_iso,
@@ -771,12 +767,30 @@ if not blocked:
                                 model_id,
                                 finish,
                                 latency,
-                                reply,
-                                tag_summary(reply),
+                                f"[{finish}]",
+                                "",
                             ]
                         )
-                    flush_turn_logs(turn_rows)
-                    st.rerun()
+                        break
+                    st.session_state.history.append(
+                        {"role": role, "content": reply, "model": model_id}
+                    )
+                    turn_rows.append(
+                        [
+                            now_iso,
+                            st.session_state.session_id,
+                            turn,
+                            role,
+                            model_id,
+                            model_id,
+                            finish,
+                            latency,
+                            reply,
+                            tag_summary(reply),
+                        ]
+                    )
+                flush_turn_logs(turn_rows)
+                st.rerun()
 
 # ---------- FOOTER ----------
 st.markdown(
