@@ -1,0 +1,42 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6 hours is plenty
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Wake Streamlit app
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright >/dev/null 2>&1
+          npx playwright install chromium --with-deps >/dev/null 2>&1
+          cat > wake.js <<'EOF'
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch();
+            const page = await browser.newPage();
+            await page.goto('https://gfmbtvjych9fz2hxu5eappq.streamlit.app',
+                            { waitUntil: 'networkidle', timeout: 60000 });
+
+            // Click the wake-up button if the app is asleep
+            const wakeBtn = page.getByRole('button', { name: /get this app back up/i });
+            if (await wakeBtn.count() > 0) {
+              console.log('App was asleep — clicking wake button');
+              await wakeBtn.click();
+              await page.waitForTimeout(15000);
+            } else {
+              console.log('App already awake');
+            }
+            await browser.close();
+          })();
+          EOF
+          node wake.js
